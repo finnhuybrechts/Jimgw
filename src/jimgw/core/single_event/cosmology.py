@@ -43,7 +43,7 @@ def luminosity_distance(H0, z, Om0, n_points=1000):
     return (1.0 + z) * comoving_distance(H0, z, Om0, n_points)
 
 
-def z_at_dL(H0, d_L, Om0=0.3111, n_iter=10):
+def z_at_dL(H0, d_L, Om0=0.3111, n_points=1000, n_iter=10):
     """Redshift at which ``luminosity_distance(H0, z, Om0) == d_L``.
 
     JAX counterpart of ``astropy.cosmology.z_at_value(cosmo.luminosity_distance, d_L)``.
@@ -69,15 +69,15 @@ def z_at_dL(H0, d_L, Om0=0.3111, n_iter=10):
 
 
     #def newton_step(_, z):
-    #    f = luminosity_distance(H0, z, Om0) - d_L
-    #    df_dz = comoving_distance(H0, z, Om0) + (1.0 + z) * c / (H0 * efunc(z, Om0))
+    #    f = luminosity_distance(H0, z, Om0, n_points) - d_L
+    #    df_dz = comoving_distance(H0, z, Om0, n_points) + (1.0 + z) * c / (H0 * efunc(z, Om0))
     #    return z - f / df_dz
     
     def newton_step(_, z):
         # Using jax.jvp rather than analytic expression for df_dz:
         # stays correct if efunc is altered (eg. when adding radiation)
         d_L_z, df_dz = jax.jvp(
-            lambda zz: luminosity_distance(H0, zz, Om0), # creates a one-argument function, z ↦ d_L(z), 
+            lambda zz: luminosity_distance(H0, zz, Om0, n_points), # creates a one-argument function, z ↦ d_L(z), 
             #with H0 and Om0 fixed at their current values. jax.jvp only differentiates wrt z when wrapped like this
             (z,), # point where you evaluate
             (jnp.ones_like(z),) # How fast luminosity distance function changes if you move the input from z in this (jnp.ones_like(z,),) direction
@@ -87,5 +87,5 @@ def z_at_dL(H0, d_L, Om0=0.3111, n_iter=10):
     # Add some kind of convergence criterion? So that there are enough steps to reach a certain tolerance?
     ## --> Use while loop instead of for loop???
 
-    z0 = H0 * d_L / c
+    z0 = H0 * d_L / c # linear Hubble law as intitial guess
     return jax.lax.fori_loop(0, n_iter, newton_step, z0)
